@@ -2,6 +2,8 @@
 title: 'Gate Pull Requests with Copilot and GitHub Agentic Workflows'
 description: 'Turn an AI review of Atlantis plans into a required GitHub check: explicit pass/fail policy, safe outputs, and the safeguards that make a merge gate trustworthy.'
 pubDate: '2026-10-01'
+heroImage: '/blog/atlantis-safety-review-failed-check.png'
+heroImageAlt: 'GitHub PR checks: the required Atlantis Safety Review fails with high risk, one destroy, and a WAF rule changed from managed_challenge to log, while eight other checks pass.'
 ---
 
 import { Mermaid } from '../../components/Mermaid';
@@ -11,6 +13,8 @@ A Terraform plan can be valid and still remove a protection you meant to keep. F
 That is where I use a Copilot-powered GitHub Agentic Workflow: read the PR diff, correlate it with the Atlantis plan, explain the risk, and produce a **check result that GitHub can require before merging**.
 
 The key is separating three things: the AI's analysis, the check's conclusion, and the repository rule that enforces it. A review comment alone does not block a merge. A failed check only becomes a merge requirement when branch protection or an active ruleset requires it.
+
+The banner shows this in practice: **eight checks passed, but the required `Atlantis Safety Review` failed**. Atlantis successfully planned the project; the AI review flagged high risk, including one destroy and a WAF rule loosened from `managed_challenge` to `log`. A successful plan does not automatically satisfy the safety review. [Open the screenshot at full size](/blog/atlantis-safety-review-failed-check.png).
 
 ## From plan output to a PR check
 
