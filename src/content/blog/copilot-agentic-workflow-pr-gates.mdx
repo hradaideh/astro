@@ -168,30 +168,13 @@ Adding `create-check-run` to a workflow does not configure that repository rule.
 
 ## Close the gaps before relying on the gate
 
-These are additional design requirements, not guarantees provided by the snippet above.
+Before making the check required, add these safeguards to the example above:
 
-**Bind the verdict to the evidence.** Record the reviewed SHA and a trusted plan identity for each project. Comment timestamps are a useful filter, but cannot prove which commit produced a plan. `target: triggering` fetches the head when publishing; if the branch changed during analysis, an old verdict could otherwise land on a new commit. A trusted publisher should validate the reviewed SHA and write the result to that exact SHA. Discard stale analysis and review the new head.
+- **Match the commit.** Bind the plan and verdict to the reviewed SHA. If the PR changes during analysis, review it again; `target: triggering` alone does not prevent stale approval.
+- **Reset on re-plan.** Clear the previous pass before reviewing new evidence. A timeout or missing result must keep the gate closed.
+- **Validate the result.** Use code to verify the verdict and plan coverage. Incomplete or uncertain evidence must not pass.
+- **Cover every PR.** Give genuinely out-of-scope changes an explicit applicability result. Merge queues need a `merge_group` path too.
 
-**Invalidate previous approval when evidence changes.** A re-plan can change the answer even without a new commit. Before reviewing new evidence, a deterministic coordinator should reset the required result to pending/in-progress. Missing output, invalid output, cancellation, timeout, or provider failure must leave the requirement unsatisfied or fail it. Otherwise an earlier green result may survive an unsuccessful re-review. Concurrency cancellation reduces overlapping work; it does not implement this lifecycle.
+GitHub treats `neutral` and `skipped` as acceptable required-check results. Never use them for “the AI could not decide.” See [GitHub's check behavior](https://docs.github.com/en/pull-requests/how-tos/merge-and-close-pull-requests/troubleshooting-required-status-checks).
 
-**Validate the verdict in code.** Safe outputs limit the write operation, but do not make the model's reasoning deterministic. For stronger enforcement, validate an allowlisted verdict schema, complete project coverage, evidence identity, and confidence policy in a trusted step. Only a valid explicit pass should become `success`. Keep deterministic policy scanners independently required.
-
-**Handle every PR that the rule covers.** A documentation-only PR may never produce an Atlantis comment. Add a trusted applicability check that records an explicit pass for changes genuinely outside the review scope, or ensure a review is triggered for every covered PR. Do not make missing evidence look like approval. A merge queue also needs a deliberate `merge_group` path; the comment-only example does not provide one.
-
-GitHub accepts `neutral` and `skipped` conclusions for required checks, so neither should mean “the AI could not decide.” Required checks must also report on the relevant commit. See [troubleshooting required checks](https://docs.github.com/en/pull-requests/how-tos/merge-and-close-pull-requests/troubleshooting-required-status-checks).
-
-## Test the merge behavior, not just the workflow
-
-Before making the check mandatory, exercise these cases in a test repository:
-
-| Scenario                                               | Expected behavior for a hardened gate                     |
-| ------------------------------------------------------ | --------------------------------------------------------- |
-| Complete, current, low-risk plan                       | Successful review result; other requirements still apply  |
-| High-risk removal or blocking plan error               | Failed result and blocked merge                           |
-| Missing project, truncated plan, or uncertain evidence | No successful verdict                                     |
-| New commit during analysis                             | Old analysis cannot approve the new head                  |
-| Re-plan after a pass, followed by agent failure        | Previous pass invalidated; merge remains blocked          |
-| Comment with plan markers from another account         | No trusted plan accepted                                  |
-| Documentation-only PR                                  | Explicit applicability result; no permanent waiting state |
-
-An AI review becomes useful infrastructure when its conclusion has a precise meaning, its evidence is traceable, and GitHub enforces the result. Start with the review comment, measure the false positives and missed risks, then enable the required check once the failure paths behave as deliberately as the happy path.
+Test a safe change, a risky change, a new commit during review, and an agent timeout after a previous pass. Confirm the merge gate behaves correctly in each case, then enable it alongside your existing tests and human approvals.
