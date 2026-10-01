@@ -4,7 +4,7 @@
   <img src="public/profile-banner.jpg" alt="Hamdan Radaideh - DevOps & SRE" width="100%" style="border-radius: 10px;">
 </div>
 
-[![Site Status](https://img.shields.io/website?url=https%3A%2F%2Fblog.radaideh.info)](https://blog.radiadeh.info)
+[![Site Status](https://img.shields.io/website?url=https%3A%2F%2Fblog.radaideh.info)](https://blog.radaideh.info)
 [![Built with Astro](https://img.shields.io/badge/Built%20with-Astro-FF5D01.svg)](https://astro.build)
 [![Powered by Claude](https://img.shields.io/badge/Powered%20by-Claude%20AI-7C3AED.svg)](https://anthropic.com)
 
@@ -21,9 +21,9 @@ Welcome to my personal tech blog where I share insights and experiences in DevOp
 
 ## 🌐 Connect With Me
 
-- [GitHub](https://github.com/halradaideh)
+- [GitHub](https://github.com/hradaideh)
 - [LinkedIn](https://www.linkedin.com/in/hamdan-a-radaideh/)
-- [Blog](https://blog.radiadeh.info)
+- [Blog](https://blog.radaideh.info)
 
 ## 💻 Tech Stack
 
@@ -41,7 +41,7 @@ This blog is built with modern technologies:
 ### For New Developers (Recommended)
 
 ```bash
-git clone https://github.com/halradaideh/astro.git
+git clone https://github.com/hradaideh/astro.git
 cd astro
 npm install
 npm run setup-env:dev    # One-command environment setup
@@ -55,7 +55,7 @@ The development setup automatically configures all required environment variable
 For a completely isolated development environment:
 
 ```bash
-git clone https://github.com/halradaideh/astro.git
+git clone https://github.com/hradaideh/astro.git
 cd astro
 npm run dev:docker       # Build and run in Docker with live reloading
 ```
@@ -65,7 +65,7 @@ This approach ensures consistent development environment across different machin
 ### For Production Deployment
 
 ```bash
-git clone https://github.com/halradaideh/astro.git
+git clone https://github.com/hradaideh/astro.git
 cd astro
 npm install
 npm run setup-env:prod   # Create production template
@@ -108,7 +108,7 @@ npm run setup-env help     # Show all available options
 | `SITE_URL`                | Production site URL            | `https://blog.radaideh.info` | **Required** |
 | `DEV_URL`                 | Development server URL         | `http://localhost:4321`      | **Required** |
 | `DEV_PORT`                | Development server port        | `4321`                       | **Required** |
-| `GISCUS_REPO`             | GitHub repository for comments | `halradaideh/astro`          | **Required** |
+| `GISCUS_REPO`             | GitHub repository for comments | `hradaideh/astro`            | **Required** |
 | `GISCUS_REPO_ID`          | Giscus repository ID           | Real ID                      | **Required** |
 | `GISCUS_CATEGORY`         | Giscus discussion category     | `General`                    | **Required** |
 | `GISCUS_CATEGORY_ID`      | Giscus category ID             | Real ID                      | **Required** |
@@ -235,9 +235,9 @@ The project includes a comprehensive CI/CD pipeline with:
 
 ## 📝 Latest Articles
 
-- [DDoS Protection with Cloudflare: From Basic to Advanced](/blog/ddos-protection-with-cloudflare)
-- [Automated Proxmox Deployment with PXE and Preseed](/blog/pxe-preseed-proxmox)
-- [Dynamic DNS with PowerDNS: A Complete Guide](/blog/ddns-with-powerdns)
+- [Gate Pull Requests with Copilot and GitHub Agentic Workflows](src/content/blog/copilot-agentic-workflow-pr-gates.mdx)
+- [Cordless Terraform: Apply Infrastructure With Zero Code in Your Repo](https://blog.radaideh.info/blog/cordless-terraform-self-service-provisioning/)
+- [Terminal Tools for AI Agents: Lynx and mdv](https://blog.radaideh.info/blog/terminal-tools-ai-agents/)
 
 ## 🤖 AI Assistant
 
@@ -267,7 +267,7 @@ This project is licensed under the **Creative Commons Attribution-NonCommercial 
 
 ### Commercial Use
 
-For commercial licensing, please contact [Hamdan Radaideh](https://github.com/halradaideh) to discuss terms.
+For commercial licensing, please contact [Hamdan Radaideh](https://github.com/hradaideh) to discuss terms.
 
 **License**: [CC BY-NC-4.0](https://creativecommons.org/licenses/by-nc/4.0/)
 
