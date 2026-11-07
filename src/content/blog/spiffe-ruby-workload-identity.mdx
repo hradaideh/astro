@@ -23,7 +23,7 @@ Without a native client, Ruby applications relied on insecure workarounds like s
 
 ### Introducing spiffe-workload: First Ruby Client for SPIFFE
 
-The [spiffe-workload gem](https://github.com/halradaideh/spiffe-rubygem) fills this ecosystem gap with a **production-ready** implementation:
+The [spiffe-workload gem](https://github.com/hradaideh/spiffe-rubygem) fills this ecosystem gap with a **production-ready** implementation:
 
 | Feature                 | Description                                |
 | ----------------------- | ------------------------------------------ |
@@ -247,13 +247,13 @@ request['Authorization'] = "Bearer #{jwt.token}"
 
 The gem joins official clients for other languages:
 
-| Language | Client Library                                                       | Status                      |
-| -------- | -------------------------------------------------------------------- | --------------------------- |
-| Go       | [go-spiffe](https://github.com/spiffe/go-spiffe)                     | ✅ Official                 |
-| Python   | [py-spiffe](https://github.com/HewlettPackard/py-spiffe)             | ✅ Official                 |
-| Java     | [java-spiffe](https://github.com/spiffe/java-spiffe)                 | ✅ Official                 |
-| Rust     | [spiffe-rs](https://docs.rs/spiffe)                                  | ✅ Official                 |
-| **Ruby** | **[spiffe-workload](https://github.com/halradaideh/spiffe-rubygem)** | **🆕 First Implementation** |
+| Language | Client Library                                                     | Status                      |
+| -------- | ------------------------------------------------------------------ | --------------------------- |
+| Go       | [go-spiffe](https://github.com/spiffe/go-spiffe)                   | ✅ Official                 |
+| Python   | [py-spiffe](https://github.com/HewlettPackard/py-spiffe)           | ✅ Official                 |
+| Java     | [java-spiffe](https://github.com/spiffe/java-spiffe)               | ✅ Official                 |
+| Rust     | [spiffe-rs](https://docs.rs/spiffe)                                | ✅ Official                 |
+| **Ruby** | **[spiffe-workload](https://github.com/hradaideh/spiffe-rubygem)** | **🆕 First Implementation** |
 
 **Architecture:** gRPC over Unix sockets
 
@@ -355,13 +355,13 @@ puts "Identity: #{svid.spiffe_id}"
 
 **Project Links:**
 
-- 📦 [GitHub Repository](https://github.com/halradaideh/spiffe-rubygem) — Source and examples
+- 📦 [GitHub Repository](https://github.com/hradaideh/spiffe-rubygem) — Source and examples
 - 💎 [RubyGems Package](https://rubygems.org/gems/spiffe-workload) — Installation
 - 📖 [SPIFFE Docs](https://spiffe.io/docs/) — Standards and guides
 
 **Production Examples:**
 
-- 🎭 [Puppet + SPIRE + Vault Integration](https://github.com/halradaideh/spiffe-rubygem/tree/main/examples) — Complete implementation
+- 🎭 [Puppet + SPIRE + Vault Integration](https://github.com/hradaideh/spiffe-rubygem/tree/main/examples) — Complete implementation
 - 📝 Full function source in the gem repository
 
 **SPIFFE Ecosystem:**

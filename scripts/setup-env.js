@@ -47,7 +47,7 @@ DEV_PORT="4321"
 # GIT_VERSION="0.0.36-dirty"
 
 # Giscus Configuration (Real values from your GitHub setup)
-GISCUS_REPO="halradaideh/astro"
+GISCUS_REPO="hradaideh/astro"
 GISCUS_REPO_ID="R_kgDOOvejuw"
 GISCUS_CATEGORY="General"
 GISCUS_CATEGORY_ID="DIC_kwDOOveju84Cqi8P"
