@@ -38,7 +38,7 @@ gh secret set DEBUG_SESSION_PASSWORD
 
 ```yaml
 - if: failure()
-  uses: halradaideh/ttyd-ngrok-debug@v0.0.1
+  uses: hradaideh/ttyd-ngrok-debug@v0.0.1
   with:
     ngrok_authtoken: ${{ secrets.NGROK_AUTHTOKEN }}
     password: ${{ secrets.DEBUG_SESSION_PASSWORD }}
@@ -63,7 +63,7 @@ jobs:
       - run: npm test
 
       - if: failure()
-        uses: halradaideh/ttyd-ngrok-debug@v0.0.1
+        uses: hradaideh/ttyd-ngrok-debug@v0.0.1
         with:
           ngrok_authtoken: ${{ secrets.NGROK_AUTHTOKEN }}
 ```
@@ -95,14 +95,14 @@ node --inspect test/failing.js
 ```yaml
 on: [push, workflow_dispatch]
 - if: github.event_name == 'workflow_dispatch'
-  uses: halradaideh/ttyd-ngrok-debug@v0.0.1
+  uses: hradaideh/ttyd-ngrok-debug@v0.0.1
 ````
 
 **Debug specific OS:**
 
 ```yaml
 - if: matrix.os == 'macos-latest' && failure()
-  uses: halradaideh/ttyd-ngrok-debug@v0.0.1
+  uses: hradaideh/ttyd-ngrok-debug@v0.0.1
 ```
 
 **tmux shortcuts:**
@@ -148,5 +148,5 @@ Three static binaries run on your runner:
 ### Resources
 
 - 🎬 [GitHub Marketplace](https://github.com/marketplace/actions/ttyd-ngrok-debug)
-- 📦 [Source Code](https://github.com/halradaideh/ttyd-ngrok-debug)
+- 📦 [Source Code](https://github.com/hradaideh/ttyd-ngrok-debug)
 - 🛠️ [ttyd](https://github.com/tsl0922/ttyd) | [ngrok](https://ngrok.com/)
