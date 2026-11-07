@@ -1,0 +1,71 @@
+<svg width="1200" height="600" viewBox="0 0 1200 600" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1200" y2="600" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#0f1a24"/>
+      <stop offset="1" stop-color="#14263a"/>
+    </linearGradient>
+    <linearGradient id="line" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#3fb68b"/>
+      <stop offset="1" stop-color="#7fe0b8"/>
+    </linearGradient>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M0 0 L10 5 L0 10 z" fill="#7fe0b8"/>
+    </marker>
+  </defs>
+
+  <rect width="1200" height="600" fill="url(#bg)"/>
+
+  <g stroke="#23384d" stroke-width="1" opacity="0.5">
+    <line x1="0" y1="150" x2="1200" y2="150"/>
+    <line x1="0" y1="450" x2="1200" y2="450"/>
+    <line x1="300" y1="0" x2="300" y2="600"/>
+    <line x1="900" y1="0" x2="900" y2="600"/>
+  </g>
+
+  <!-- the phone -->
+  <g transform="translate(150,90)">
+    <rect width="230" height="420" rx="30" fill="#1b2c3e" stroke="#3fb68b" stroke-width="3"/>
+    <rect x="16" y="40" width="198" height="330" rx="8" fill="#0b141d"/>
+    <rect x="95" y="18" width="40" height="6" rx="3" fill="#3a5068"/>
+    <circle cx="115" cy="393" r="11" fill="none" stroke="#3a5068" stroke-width="2"/>
+    <g font-family="monospace" font-size="15">
+      <text x="30" y="72" fill="#7fe0b8">$ uname -r</text>
+      <text x="30" y="96" fill="#d5e6f3">7.3.1</text>
+      <text x="30" y="132" fill="#7fe0b8">$ rc-status</text>
+      <text x="30" y="156" fill="#d5e6f3">docker  [started]</text>
+      <text x="30" y="180" fill="#d5e6f3">hisi-wifi [started]</text>
+      <text x="30" y="216" fill="#7fe0b8">$ curl :8123</text>
+      <text x="30" y="240" fill="#d5e6f3">200 OK</text>
+      <rect x="30" y="262" width="10" height="16" fill="#7fe0b8"/>
+    </g>
+  </g>
+
+  <!-- boot chain -->
+  <g font-family="monospace" font-weight="600">
+    <g transform="translate(470,120)">
+      <rect width="240" height="80" rx="14" fill="#1b2c3e" stroke="#3a5068" stroke-width="2"/>
+      <text x="120" y="35" text-anchor="middle" fill="#d5e6f3" font-size="19">Huawei bootloader</text>
+      <text x="120" y="60" text-anchor="middle" fill="#8aa4bb" font-size="14">+31 key=value params</text>
+    </g>
+    <path d="M590 200 V250" stroke="url(#line)" stroke-width="3" marker-end="url(#arrow)"/>
+    <g transform="translate(470,260)">
+      <rect width="240" height="80" rx="14" fill="#1b2c3e" stroke="#3fb68b" stroke-width="2.5"/>
+      <text x="120" y="35" text-anchor="middle" fill="#7fe0b8" font-size="20">Linux 7.3.1</text>
+      <text x="120" y="60" text-anchor="middle" fill="#8aa4bb" font-size="14">mainline + p9test</text>
+    </g>
+    <path d="M590 340 V390" stroke="url(#line)" stroke-width="3" marker-end="url(#arrow)"/>
+    <g transform="translate(470,400)">
+      <rect width="240" height="80" rx="14" fill="#1b2c3e" stroke="#3a5068" stroke-width="2"/>
+      <text x="120" y="35" text-anchor="middle" fill="#d5e6f3" font-size="19">postmarketOS</text>
+      <text x="120" y="60" text-anchor="middle" fill="#8aa4bb" font-size="14">apk upgrade flashes boot</text>
+    </g>
+  </g>
+
+  <!-- 2016 -> 2026 -->
+  <g font-family="monospace" font-weight="700" text-anchor="middle">
+    <text x="960" y="250" fill="#3a5068" font-size="64">4.4</text>
+    <path d="M960 275 V325" stroke="url(#line)" stroke-width="3" marker-end="url(#arrow)"/>
+    <text x="960" y="395" fill="#7fe0b8" font-size="64">7.3.1</text>
+    <text x="960" y="440" fill="#8aa4bb" font-size="16" font-weight="400">a 2016 phone on mainline</text>
+  </g>
+</svg>

@@ -1,0 +1,146 @@
+---
+title: 'Mainline Linux 7.3.1 on a 2016 Huawei Phone That Runs My Home Assistant'
+description: 'Porting a Huawei P9 lite home server from its vendor 4.4 kernel to mainline Linux 7.3.1 with postmarketOS — the Wi-Fi driver port, a boot-fail mode that ate my test images, and the one Kconfig default that silently killed every boot'
+pubDate: '2026-11-07'
+heroImage: '/blog/p9-lite-mainline.svg'
+---
+
+import { Mermaid } from '../../components/Mermaid';
+
+An old **Huawei P9 lite** (Kirin 650, 2 GB RAM) sits on a shelf at home running postmarketOS, Docker, **Home Assistant** and nginx over its own Wi-Fi. Until this week it did that on Huawei's vendor **4.4** kernel. Now it runs **mainline Linux 7.3.1**, and the kernel arrives as a normal postmarketOS package: `apk upgrade` rebuilds the boot image and flashes it.
+
+The code is on GitHub: [hradaideh/p9lite-mainline](https://github.com/hradaideh/p9lite-mainline).
+
+---
+
+### The Starting Point
+
+- **Boot, eMMC, USB** on mainline needed a small built-in helper, `p9test`, that fixes up the vendor device tree at boot: stand-in clocks, the SDHCI node, the USB PHY, the SDIO slot for Wi-Fi.
+- **Wi-Fi** is a Hisilicon **Hi1102**. There is no mainline driver, so Huawei's GPL driver from the 4.4 tree was ported to 7.x: about 200 files, a compat layer for removed kernel APIs, and a lot of `wakelock` and `timer_list` archaeology. It scans, does WPA2 and passes traffic.
+- **Userspace** is unchanged: the same postmarketOS rootfs, OpenRC, Docker with cgroup v1, iptables and nftables.
+
+Every piece passed on its own — a test kernel with a tiny busybox `/init` booted every time. The real postmarketOS image never did.
+
+---
+
+### Huawei's Boot-Fail Mode
+
+When the production image failed, the phone did not reboot into fastboot. It booted **eRecovery** instead, and stayed there until someone pressed "Reboot" on the screen.
+
+That is Huawei's **boot-fail mode**. The vendor kernel source (`drivers/hwbfm`) explains it:
+
+- The bootloader keeps a **boot keypoint** in a PMIC register (`HRST_REG1`). Stock Android sets it to **250** once boot completes.
+- A reset before 250 — watchdog, panic, thermal — counts as a **boot failure**. A few of those and the bootloader boots `recovery2` (eRecovery).
+- Every failure is recorded in the `bootfail_info` partition: a `BFIX` header, then 4 KiB records holding an RTC timestamp, an errno and a stage code.
+
+Decoding those records gave the first real clue. Every failed boot said the same thing:
+
+```text
+2026-11-07 05:45:45  errno 0x03000003 (KERNEL_AP_WDT)   stage 0x02000004 (BL2_STAGE_END)
+```
+
+The AP watchdog fired, and the last progress the bootloader saw was **its own handoff to the kernel**. The kernel died before any of my code ran — so no log, no panic handler, nothing.
+
+---
+
+### Making Failure Cheap First
+
+Before hunting the bug, I made failing safe. Every eRecovery round needed a human at the phone.
+
+<Mermaid
+  client:load
+  chart={`graph TD
+    B[Bootloader] --> E[p9early: keypoint 250 + crash marker]
+    E --> K[Kernel init]
+    K --> U[Userspace]
+    U --> OK[boot_ok=1: normal reboots from now on]
+    K -- hang / watchdog --> R[Next boot sees marker]
+    U -- panic / deadline --> F[Fastboot, log kept]
+    R --> F
+
+    style OK fill:#d4edda
+    style F fill:#fff3cd`}
+
+/>
+
+- **`p9early`** is a kernel parameter handled in `parse_early_param`, long before any initcall. It writes keypoint **250** straight away, so the bootloader never counts our resets as boot failures. It also leaves a **marker in RAM** that survives a warm reset.
+- A boot that finds the marker still set knows the previous one died. It restarts **straight to fastboot** and leaves the dead boot's kernel log untouched for the next kernel to read.
+- Until userspace writes `boot_ok=1`, every panic, hang or reboot goes to fastboot, and a 10-minute deadline forces it.
+
+Each piece was tested by breaking things on purpose: a forced panic, then a starved watchdog — the exact reset that used to mean eRecovery. Both landed in fastboot by themselves, with logs.
+
+---
+
+### The Bisection
+
+With failure cheap, I stopped guessing and split the difference between the image that booted and the one that didn't:
+
+| Image | Ramdisk                     | Kernel command line | Result   |
+| ----- | --------------------------- | ------------------- | -------- |
+| Test  | small busybox               | test                | boots    |
+| T2    | small, **padded to 7.9 MB** | test                | boots    |
+| T1    | small busybox               | **production**      | **dies** |
+
+Ramdisk size was innocent. The **command line** killed it.
+
+---
+
+### The One-Line Cause
+
+Linux passes every unknown `key=value` boot parameter without a dot to init as an **environment variable**, and allows at most `CONFIG_INIT_ENV_ARG_LIMIT` of them — **32** by default. Past that, `start_kernel` panics:
+
+```c
+panic("Too many boot %s vars at `%s'", panic_later, panic_param);
+```
+
+The Huawei bootloader appends about **31** dot-less parameters of its own: `boardid=`, `himntn=`, `TP_COLOR=`, `ddr_die=` and friends. The vendor kernel consumes them in Huawei drivers; mainline doesn't know them. postmarketOS adds three more (`pmos_boot_uuid=`, `pmos_root_uuid=`, `pmos_rootfsopts=`), and the count goes over the edge.
+
+The panic happens before the console exists, so it is silent. The watchdog the bootloader left running fires, and boot-fail mode does the rest.
+
+```diff
+ config INIT_ENV_ARG_LIMIT
+ 	int
+-	default 32 if !UML
++	default 128 if !UML
+```
+
+The test image with the production command line booted 41 seconds after that change.
+
+---
+
+### Two More Things Mainline Didn't Like
+
+- **`console=ttyS0`** comes from the bootloader, but mainline names these UARTs `ttyAMA*`. PID 1 started with no stdin or stdout. A busybox `/init` doesn't care; the postmarketOS init dies on its first redirect. Fix: add `console=tty0`.
+- **The firewall started working.** The vendor kernel never loaded postmarketOS's nftables ruleset, so the phone had effectively been running without one. Mainline loads it, with an input policy of `drop`, and Home Assistant disappeared from the LAN until port 8123 got an explicit rule.
+
+I also ruled out heat: 8 cores at 100 % for 10 minutes on 7.3.1 without a single thermal reset.
+
+---
+
+### Making It a Package
+
+The last step was making updates boring. postmarketOS already has the machinery:
+
+- **`linux-huawei-venus-mainline`** ships the 7.3.1 image and modules, including the Hi1102 driver. It `provides` and `replaces` `linux-huawei-venus`, so the device package stays satisfied.
+- **`p9lite-mainline`** ships `/etc/deviceinfo` with the kernel command line and `deviceinfo_flash_kernel_on_update="true"`, plus the `boot_ok` signal and the firewall rule.
+- Both are built with `abuild` in an Alpine aarch64 container, signed, and served from a local repo on the phone.
+
+```sh
+sudo apk upgrade
+# postmarketos-mkinitfs: new initramfs
+# boot-deploy: boot.img from /boot/vmlinuz + deviceinfo
+# ==> Flashing boot image
+# Flashing boot.img to 'boot'
+sudo reboot     # back with Home Assistant in ~65 s
+```
+
+---
+
+### Takeaways
+
+- **Decode the bootloader's own records before guessing.** `bootfail_info` said "the kernel never started" long before any kernel log could.
+- **Make failure cheap, then bisect.** An hour spent on the recovery net turned every later test into a two-minute loop with no hands on the phone.
+- **Vendor bootloaders talk to vendor kernels.** Anything they pass in — command-line parameters, console names, reset reasons — is an interface mainline doesn't speak.
+- **Check the defaults you never set.** `INIT_ENV_ARG_LIMIT` has no menu prompt, and 32 is plenty everywhere except here.
+
+Still open: the display (simplefb), the charger, CPU frequency scaling, and reading the real Wi-Fi MAC address from Huawei's NVE partition.
