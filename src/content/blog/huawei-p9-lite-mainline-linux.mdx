@@ -13,7 +13,36 @@ The code is on GitHub: [hradaideh/p9lite-mainline](https://github.com/hradaideh/
 
 ---
 
-### The Starting Point
+### How It Got Here
+
+The mainline port is the last chapter of a longer project. The phone started as a locked, stock EMUI handset.
+
+<Mermaid
+  client:load
+  chart={`graph LR
+    A[PotatoNV unlock] --> B[FBLOCK: boot partitions writable]
+    B --> C[postmarketOS on vendor 4.4]
+    C --> D[Docker + Home Assistant]
+    D --> E[Mainline 7.3.1 port]
+    E --> F[apk-packaged kernel]
+
+    style C fill:#fff3cd
+    style F fill:#d4edda`}
+
+/>
+
+1. **Unlocking the bootloader.** Huawei stopped issuing unlock codes years ago. **PotatoNV**, run from a Windows machine with the phone in Kirin's USB download mode, wrote a new unlock code into the phone's NVME (Huawei's non-volatile settings store), and `fastboot oem unlock` with that code did the rest.
+2. **Making the boot partitions writable.** An unlocked bootloader still refused to write the boot partitions until **FBLOCK** was unlocked as well. PotatoNV writes that flag in the same pass.
+3. **postmarketOS on the vendor kernel.** Getting the first image to boot on Huawei's **4.4** kernel took Claude and me around two weeks. The fixes ranged from an initramfs compressed in a format the kernel couldn't read to a Wi-Fi firmware version mismatch and an OpenRC service that brings up the vendor Wi-Fi driver with P2P disabled, because creating the P2P interface crashed it.
+4. **Home Assistant, minus WARP.** Docker ran, but only on cgroup v1. The real wall was **Cloudflare WARP**: the vendor kernel has legacy iptables wired in and no nftables, which WARP needs. Even a 4.4 rebuild with nftables bolted on fell short, because Cloudflare's connector also wants nftables features that only arrived in 5.x kernels. Home Assistant went live without WARP.
+5. **Mainline.** That ceiling is what made a mainline port worth trying: device tree fixups, hardware drivers, porting Huawei's Hi1102 Wi-Fi driver, and a run of boot failures that ended at the kernel's `INIT_ENV_ARG_LIMIT` of 32. That is the rest of this post.
+6. **Automation.** Finally, the kernel became an Alpine `apk` package, so a kernel upgrade is now just `apk upgrade`.
+
+Today the phone runs **mainline Linux 7.3.1**, Docker, Home Assistant and nginx.
+
+---
+
+### Where the Port Started
 
 - **Boot, eMMC, USB** on mainline needed a small built-in helper, `p9test`, that fixes up the vendor device tree at boot: stand-in clocks, the SDHCI node, the USB PHY, the SDIO slot for Wi-Fi.
 - **Wi-Fi** is a Hisilicon **Hi1102**. There is no mainline driver, so Huawei's GPL driver from the 4.4 tree was ported to 7.x: about 200 files, a compat layer for removed kernel APIs, and a lot of `wakelock` and `timer_list` archaeology. It scans, does WPA2 and passes traffic.
