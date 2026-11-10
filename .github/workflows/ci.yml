@@ -655,9 +655,6 @@ jobs:
                   "kv_namespaces": {
                     "VISIT_COUNTS": {
                       "namespace_id": "${{ secrets.KV_VISIT_COUNTS_ID }}"
-                    },
-                    "LIKES": {
-                      "namespace_id": "${{ secrets.KV_LIKES_ID }}"
                     }
                   }
                 },
@@ -665,9 +662,6 @@ jobs:
                   "kv_namespaces": {
                     "VISIT_COUNTS": {
                       "namespace_id": "${{ secrets.KV_VISIT_COUNTS_ID }}"
-                    },
-                    "LIKES": {
-                      "namespace_id": "${{ secrets.KV_LIKES_ID }}"
                     }
                   }
                 }
@@ -697,12 +691,6 @@ jobs:
             echo "❌ KV_VISIT_COUNTS_ID secret is not set"
           else
             echo "✅ KV_VISIT_COUNTS_ID secret is set"
-          fi
-
-          if [ -z "${{ secrets.KV_LIKES_ID }}" ]; then
-            echo "❌ KV_LIKES_ID secret is not set"
-          else
-            echo "✅ KV_LIKES_ID secret is set"
           fi
 
           echo ""
@@ -808,7 +796,7 @@ jobs:
           export CLOUDFLARE_ACCOUNT_ID="${{ secrets.CF_ACCOUNT_ID }}"
 
           # Check if namespaces exist, create if not
-          for ns in VISIT_COUNTS LIKES; do
+          for ns in VISIT_COUNTS; do
             echo "Checking KV namespace: $ns"
             npx wrangler@${{ env.WRANGLER_VERSION }} kv:namespace list | grep -q "$ns" || {
               echo "Creating KV namespace: $ns"

@@ -31,7 +31,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     }
 
     // Check if required KV namespaces are available
-    const envHealthy = !!(env.VISIT_COUNTS && env.LIKES);
+    const envHealthy = !!env.VISIT_COUNTS;
 
     const health: HealthResponse = {
       status: kvHealthy && envHealthy ? 'healthy' : 'unhealthy',

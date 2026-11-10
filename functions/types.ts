@@ -1,7 +1,6 @@
 /// <reference types="@cloudflare/workers-types" />
 
 export interface Env {
-  LIKES: KVNamespace;
   VISIT_COUNTS: KVNamespace;
 }
 
