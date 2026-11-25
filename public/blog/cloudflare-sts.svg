@@ -1,0 +1,72 @@
+<svg width="1200" height="600" viewBox="0 0 1200 600" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1200" y2="600" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#0f1a24"/>
+      <stop offset="1" stop-color="#14263a"/>
+    </linearGradient>
+    <linearGradient id="line" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#f6821f"/>
+      <stop offset="1" stop-color="#ffb55a"/>
+    </linearGradient>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M0 0 L10 5 L0 10 z" fill="#ffb55a"/>
+    </marker>
+  </defs>
+
+  <rect width="1200" height="600" fill="url(#bg)"/>
+
+  <g stroke="#23384d" stroke-width="1" opacity="0.5">
+    <line x1="0" y1="150" x2="1200" y2="150"/>
+    <line x1="0" y1="450" x2="1200" y2="450"/>
+  </g>
+
+  <text x="600" y="60" text-anchor="middle" fill="#8aa4bb" font-family="monospace" font-size="18" font-weight="600">no long-lived Cloudflare token anywhere</text>
+
+  <!-- caller -->
+  <g font-family="monospace" font-weight="600">
+    <g transform="translate(70,240)">
+      <rect width="230" height="120" rx="16" fill="#1b2c3e" stroke="#3a5068" stroke-width="2"/>
+      <text x="115" y="42" text-anchor="middle" fill="#d5e6f3" font-size="20">workload</text>
+      <text x="115" y="72" text-anchor="middle" fill="#8aa4bb" font-size="14">CI · GCP SA</text>
+      <text x="115" y="94" text-anchor="middle" fill="#8aa4bb" font-size="14">SPIFFE · AWS</text>
+    </g>
+
+    <!-- jwt arrow -->
+    <path d="M300 300 H420" stroke="url(#line)" stroke-width="3" marker-end="url(#arrow)"/>
+    <text x="360" y="288" text-anchor="middle" fill="#ffb55a" font-size="14">OIDC JWT</text>
+
+    <!-- worker -->
+    <g transform="translate(430,210)">
+      <rect width="320" height="180" rx="18" fill="#1b2c3e" stroke="#f6821f" stroke-width="3"/>
+      <text x="160" y="46" text-anchor="middle" fill="#ffb55a" font-size="22">cf-sts Worker</text>
+      <g font-size="14" fill="#d5e6f3" font-weight="400">
+        <text x="30" y="82">1. verify JWT signature</text>
+        <text x="30" y="108">2. match principal → policy</text>
+        <text x="30" y="134">3. check replay (D1 jti)</text>
+        <text x="30" y="160">4. mint scoped token</text>
+      </g>
+    </g>
+
+    <!-- parent cred -->
+    <g transform="translate(510,430)">
+      <rect width="160" height="70" rx="12" fill="#0b141d" stroke="#3a5068" stroke-width="2"/>
+      <text x="80" y="30" text-anchor="middle" fill="#8aa4bb" font-size="13">Secrets Store</text>
+      <text x="80" y="52" text-anchor="middle" fill="#6f8aa3" font-size="13">parent token</text>
+    </g>
+    <path d="M590 430 V390" stroke="#3a5068" stroke-width="2" stroke-dasharray="4 4"/>
+
+    <!-- cf api -->
+    <path d="M750 300 H880" stroke="url(#line)" stroke-width="3" marker-end="url(#arrow)"/>
+    <g transform="translate(890,240)">
+      <rect width="240" height="120" rx="16" fill="#1b2c3e" stroke="#3a5068" stroke-width="2"/>
+      <text x="120" y="42" text-anchor="middle" fill="#d5e6f3" font-size="20">Cloudflare API</text>
+      <text x="120" y="74" text-anchor="middle" fill="#8aa4bb" font-size="14">short-lived token</text>
+      <text x="120" y="96" text-anchor="middle" fill="#8aa4bb" font-size="14">TTL 5 min · scoped</text>
+    </g>
+  </g>
+
+  <!-- revoke -->
+  <g font-family="monospace" font-weight="700" text-anchor="middle">
+    <text x="600" y="540" fill="#7fe0b8" font-size="18">job ends → POST /revoke → token gone</text>
+  </g>
+</svg>
