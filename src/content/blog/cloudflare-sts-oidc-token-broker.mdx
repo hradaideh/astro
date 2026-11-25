@@ -1,0 +1,231 @@
+---
+title: 'cloudflare-sts: Short-Lived Cloudflare API Tokens From an OIDC JWT'
+description: "A Cloudflare Worker that trades any workload's OIDC JWT for a scoped, five-minute Cloudflare API token — so the parent credential never leaves the edge and nothing long-lived has to sit anywhere. CI is the obvious first user. The identity model, the policy-as-code layout, and the mint/revoke flow."
+pubDate: '2026-11-25'
+heroImage: '/blog/cloudflare-sts.svg'
+heroImageAlt: 'A CI job presents an OIDC JWT to the cf-sts Worker, which verifies it, matches a policy, and mints a short-lived scoped Cloudflare API token'
+---
+
+import { Mermaid } from '../../components/Mermaid';
+
+Anything that talks to the Cloudflare API tends to carry the same liability: a `CLOUDFLARE_API_TOKEN` secret, long-lived, broadly scoped, copied into every place that deploys a Worker or edits DNS. It leaks through a log line, an echoed env var, a compromised dependency, and it keeps working until someone notices and rotates it everywhere. A CI pipeline is the sharpest version of the problem — the secret is sitting in a build environment running other people's code — but a cron box, a Kubernetes pod, or a deploy script on a laptop all have the same smell.
+
+[**cloudflare-sts**](https://github.com/WileyLabs/cloudflare-sts) removes that secret. It's a Cloudflare Worker — open-sourced under MIT by **[Wiley Labs](https://github.com/WileyLabs)**, the OSS org of John Wiley & Sons — that acts as a token broker: a caller proves who it is with a short-lived **OIDC JWT**, and the Worker hands back a **scoped Cloudflare API token that expires in minutes**. The powerful parent credential stays inside the Worker and never reaches the caller. Any workload that can obtain an OIDC identity can use it; CI is just the first and most obvious one.
+
+It's the concrete version of the pattern I wrote about in [Elevating CI/CD Pipeline Security](/blog/securing-ci-pipelines-zero-trust/) — workload attestation instead of static credentials — pointed at the Cloudflare API.
+
+---
+
+### The Exchange
+
+The whole thing is one request. A workload with an OIDC identity — a GitHub Actions job, a GCP service account, a SPIFFE-attested process — already gets a JWT for free. It asks its issuer for one, presents it to the Worker, and gets a real Cloudflare token back.
+
+<Mermaid
+  client:load
+  chart={`sequenceDiagram
+    participant J as CI job
+    participant I as OIDC issuer
+    participant W as cf-sts Worker
+    participant C as Cloudflare API
+    J->>I: request JWT (aud = cf-sts.example.com)
+    I-->>J: signed JWT
+    J->>W: POST /token (Bearer JWT)
+    W->>W: verify sig, match principal, check replay
+    W->>C: mint scoped token (parent from Secrets Store)
+    C-->>W: short-lived token
+    W-->>J: id, token, expires_on
+    J->>W: POST /revoke (fresh JWT, token_id)`}
+/>
+
+Nothing persistent lives in the caller. The JWT is good for one call — it's burned on use — and the minted token is gone either when the caller hits `/revoke` or when its TTL runs out. GitHub Actions is the example that needs the least wiring, since the broker ships an Action; from the workflow's side it's three lines:
+
+```yaml
+permissions: { id-token: write, contents: read }
+steps:
+  - uses: WileyLabs/cloudflare-sts/action@v0.0.1
+    with: { ttl-seconds: 300 }
+  # $CLOUDFLARE_API_TOKEN is now set — and revoked when the job ends
+```
+
+---
+
+### Who's Allowed, and to Do What
+
+The interesting part isn't the exchange, it's the authorization. A valid JWT proves identity; it says nothing about what that identity should be allowed to mint. That decision is **policy-as-code**, laid out as a directory tree keyed by the issuer's own claims:
+
+```text
+policy/<provider>/<account>/<resource>[/<principal>]/policy.yaml
+```
+
+For a GitHub repo that maps to `policy/github/<org>/<repo>/<principal>/policy.yaml`, where the principal is a slug for the JWT `sub` — a specific environment, branch ref, or workflow. Each rule matches on the principal plus optional extra `claims`, and the match is deliberately strict: **one identity resolves to exactly one file and one rule**, no merging across the tree. You can read the full policy off disk and know precisely what a given caller gets.
+
+What it gets is expressed as **grants**, which keep the Cloudflare permission soup out of individual rules:
+
+```yaml
+# policy/profiles.yaml — named, reusable permission sets
+dns-read:
+  permissions: [DNS Read]
+
+worker-deploy-account:
+  permissions:
+    - Workers Scripts Write
+    - D1 Write
+    - Account Settings Read
+    - Secrets Store Write
+
+# in a rule
+grants:
+  - profile: worker-deploy-account # account-scoped
+  - profile: worker-deploy-zone # zone-scoped
+    zones: [example.com] # names resolved to IDs at mint time
+```
+
+A caller can ask for _less_ than its rule allows — `POST /token` takes an optional `permissions` array that narrows the grant to a subset — but never more. Least privilege is the floor, and the job can tighten it per step.
+
+Policies compile to a single gitignored `policy.bundle.json` (`npm run build:policy`), which is what the Worker actually reads. Build and verify happen in CI and locally via a `pretest` hook, so a malformed policy fails before it ships.
+
+---
+
+### A Worked Example: Deploying a Worker With Wrangler
+
+Here's the case that made me want this in the first place — a GitHub Actions job that runs `wrangler deploy`. Wrangler authenticates to Cloudflare with the `CLOUDFLARE_API_TOKEN` environment variable, so the usual setup is to drop a long-lived token into repo secrets and hope nothing ever echoes it. With cf-sts, the repo holds **no Cloudflare secret at all** — the job's own identity is the credential.
+
+First, a policy rule says _this exact identity_ may mint a Worker-deploy token. The principal and claims pin it to the `production` environment, the `main` ref, and one specific workflow file:
+
+```yaml
+# policy/github/my-org/edge-api/environment-production/policy.yaml
+rules:
+  - id: edge-api-deploy
+    description: Deploy from GitHub Environment production on main only
+    principal:
+      - repo:my-org/edge-api:environment:production
+    claims:
+      ref: refs/heads/main
+      job_workflow_ref: my-org/edge-api/.github/workflows/deploy.yml@refs/heads/main
+      environment: production
+    max_ttl_seconds: 900
+    grants:
+      - profile: worker-deploy-account # Workers Scripts Write, KV, D1, Secrets Store…
+      - profile: worker-deploy-zone # Workers Routes Write, DNS Write, Zone Read
+        zones: [edge-api.example.com]
+```
+
+Then the workflow. The only privilege it declares is `id-token: write` — permission to mint its own OIDC JWT. There is no `secrets.CLOUDFLARE_API_TOKEN` anywhere:
+
+```yaml
+# .github/workflows/deploy.yml
+name: deploy
+on:
+  push: { branches: [main] }
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production # must match the policy's claim
+    permissions:
+      id-token: write # mint the OIDC JWT — this is the whole credential
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 24 }
+      - run: npm ci
+
+      - uses: WileyLabs/cloudflare-sts/action@v0.0.1
+        with:
+          url: https://cf-sts.example.com
+          ttl-seconds: 900
+
+      - run: npx wrangler deploy # reads CLOUDFLARE_API_TOKEN from the step above
+      # the token is revoked in a post step when the job ends — pass or fail
+```
+
+The chain is worth tracing once:
+
+1. GitHub issues the job a JWT whose `sub` is `repo:my-org/edge-api:environment:production`, with `ref`, `environment`, and `job_workflow_ref` claims baked in by GitHub — the job can't forge them.
+2. The action POSTs it to the Worker. The Worker verifies the signature against GitHub's JWKS, finds the one matching rule, and confirms every pinned claim.
+3. It mints a token scoped to exactly `worker-deploy-account` + `worker-deploy-zone` on `edge-api.example.com`, capped at 900 seconds, and exports it as `CLOUDFLARE_API_TOKEN`.
+4. `wrangler deploy` picks that env var up with zero extra config and ships the Worker.
+5. The action's `post` step calls `/revoke` with a fresh JWT when the job ends, so the token is dead within the minute even if the 15-minute TTL hasn't elapsed.
+
+A pull request from a fork, a push to a feature branch, or a different workflow in the same repo all fail at step 2 — the claims don't match, so no token is minted. The blast radius of this pipeline is one environment, one zone, fifteen minutes, and nothing is left behind to steal.
+
+---
+
+### Why a Worker, and Where the Parent Token Lives
+
+Putting the broker _on_ Cloudflare is the point. The parent API token — the one powerful enough to mint other tokens — lives in **Cloudflare Secrets Store**, bound to the Worker, and is read only at mint time. It never transits a pipeline, never lands in a GitHub secret, never shows up in a log. The Worker is careful never to log either the parent or the minted secret.
+
+One sharp edge the README is honest about: that parent token has to be created **by hand in the Cloudflare dashboard**. The API and Terraform can't create a token that is itself allowed to manage other tokens, so this one step stays manual, and the token must carry the union of every permission any rule might grant.
+
+Everything else is ordinary Worker infrastructure doing security work:
+
+- **D1** backs the audit trail (`mints`, `denials`) and, more importantly, replay defence — every JWT's `jti` (or a `sha256` of the header and payload when there's no `jti`) is recorded, and a second presentation is rejected. Replay protection is hard-required; the audit writes are best-effort.
+- **Rate limiting** is keyed both per client IP and per `iss:sub`, so one noisy or compromised identity can't exhaust the broker for everyone.
+- Minted **token names** embed `sha(iss:sub)`, which is how `/revoke` enforces ownership: only the same issuer-and-subject that minted a token may revoke it.
+
+---
+
+### Not Just GitHub
+
+The identity layer is pluggable — the issuer modules live under `src/issuers/`, and each one knows how to fetch the right JWKS and which claim is the principal:
+
+| Issuer     | Principal             | Typical caller                        |
+| ---------- | --------------------- | ------------------------------------- |
+| **github** | `sub`                 | GitHub Actions workflow / environment |
+| **gcp**    | service-account email | Cloud Build, GKE workload             |
+| **spiffe** | `sub` (SPIFFE ID)     | a SPIRE-attested workload             |
+| **aws**    | `sub`                 | IAM outbound identity federation      |
+
+The SPIFFE path is the same workload-identity idea I played with in [SPIFFE/SPIRE for Ruby](/blog/spiffe-ruby-workload-identity/), now cashed out as real Cloudflare permissions instead of a demo. The v0.0.1 release ships reference Terraform for the GCP issuer and a SPIRE config example, so the non-GitHub paths aren't just theoretical.
+
+---
+
+### Running Your Own
+
+The broker is one Worker in your own Cloudflare account. Fork [**WileyLabs/cloudflare-sts**](https://github.com/WileyLabs/cloudflare-sts) and stand it up in roughly five steps.
+
+**1. Create the parent token — by hand.** In the Cloudflare dashboard, mint an API token that holds the _union_ of every permission your rules will grant. This is the one manual step: the API and Terraform can't create a token that's allowed to manage other tokens.
+
+**2. Store it in Secrets Store** and bind it as `CF_PARENT_TOKEN` (the parent never lives in `wrangler.toml` or a repo secret):
+
+```bash
+npx wrangler secrets-store store create sts --remote
+npx wrangler secrets-store secret create <STORE_ID> \
+  --name cf-parent-token --scopes workers --remote
+```
+
+**3. Provision the bindings** the Worker needs and fill their IDs into `wrangler.toml` — a D1 database for audit + replay, two rate-limit buckets, your account ID, and the custom domain the broker answers on:
+
+```bash
+npx wrangler d1 create cloudflare-sts     # → put database_id in wrangler.toml
+# set CF_ACCOUNT_ID, the RATE_LIMIT / DASH_LIMIT namespaces, and
+# routes = [{ pattern = "cf-sts.your-domain.com", custom_domain = true }]
+```
+
+**4. Write your policy** under `policy/<provider>/<account>/<resource>/…`, then compile and sanity-check it:
+
+```bash
+npm install
+npm run build:policy && npm run verify:policy
+```
+
+**5. Migrate the database, then deploy:**
+
+```bash
+npx wrangler d1 migrations apply DB --remote   # before the first deploy
+npm test && npx wrangler deploy
+```
+
+That's the Worker live at `https://cf-sts.your-domain.com`, serving `/token` and `/revoke` plus a read-only dashboard at `/` (optionally gated behind Cloudflare Access). The reference GitHub Actions workflows under `.github/workflows/` are disabled on the upstream repo but ready to run in your fork. Point your pipelines at the [Action](https://github.com/WileyLabs/cloudflare-sts) as shown above, and no Cloudflare secret ever touches them again.
+
+---
+
+### Takeaways
+
+- **The best credential is the one that isn't there.** An OIDC JWT the workload can already mint, traded for a token that dies in five minutes, beats any secret you have to store and rotate — in a pipeline, a pod, or a cron job alike.
+- **Keep the powerful credential off the wire.** The parent token stays in the Worker's Secrets Store; the caller only ever holds something scoped and short-lived.
+- **Authorization is a separate question from authentication.** The JWT says who you are; a strict one-identity-one-rule policy tree says what you may mint. Grants and profiles keep that readable.
+- **Replay defence is non-negotiable, audit is best-effort.** Getting that ordering right is what makes single-use JWTs actually single-use.
+
+It's MIT-licensed and open source from Wiley Labs: [**github.com/WileyLabs/cloudflare-sts**](https://github.com/WileyLabs/cloudflare-sts). Still v0.0.1 — the issuer set and the deploy story will keep filling in.
